@@ -14,7 +14,7 @@ export class Session extends BaseEntity {
   @Column()
   refreshTokenHash: string;
 
-  @Column({ type: 'timestamp' })
+  @Column()
   expiresAt: Date;
 
   @Column({ nullable: true })

@@ -1,4 +1,10 @@
-import { Injectable, NotFoundException, ConflictException, OnModuleInit, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+  OnModuleInit,
+  Logger,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
@@ -28,10 +34,18 @@ export class UsersService implements OnModuleInit {
 
   private async seedAdmin() {
     try {
-      const adminEmail = this.configService.get<string>('ADMIN_SEED_EMAIL', 'admin@astroassist.com');
-      const adminPassword = this.configService.get<string>('ADMIN_SEED_PASSWORD', 'AstroAdmin123!');
-      
-      const existingAdmin = await this.userRepository.findOne({ where: { role: Role.ADMIN } });
+      const adminEmail = this.configService.get<string>(
+        'ADMIN_SEED_EMAIL',
+        'admin@astroassist.com',
+      );
+      const adminPassword = this.configService.get<string>(
+        'ADMIN_SEED_PASSWORD',
+        'AstroAdmin123!',
+      );
+
+      const existingAdmin = await this.userRepository.findOne({
+        where: { role: Role.ADMIN },
+      });
       if (existingAdmin) {
         return; // Admin already exists
       }
@@ -67,14 +81,20 @@ export class UsersService implements OnModuleInit {
   }
 
   async findById(id: string): Promise<User> {
-    const user = await this.userRepository.findOne({ where: { id }, relations: ['profile', 'addresses'] });
+    const user = await this.userRepository.findOne({
+      where: { id },
+      relations: ['profile', 'addresses'],
+    });
     if (!user) {
       throw new NotFoundException(`User with ID ${id} not found`);
     }
     return user;
   }
 
-  async create(userData: Partial<User>, profileData: Partial<UserProfile>): Promise<User> {
+  async create(
+    userData: Partial<User>,
+    profileData: Partial<UserProfile>,
+  ): Promise<User> {
     if (!userData.email) {
       throw new ConflictException('Email is required');
     }
@@ -82,14 +102,17 @@ export class UsersService implements OnModuleInit {
     if (existingUser) {
       throw new ConflictException('Email is already registered');
     }
-    
+
     // Check if cedula exists
-    const existingProfile = await this.userProfileRepository.findOne({ where: { cedula: profileData.cedula } });
+    const existingProfile = await this.userProfileRepository.findOne({
+      where: { cedula: profileData.cedula },
+    });
     if (existingProfile) {
       throw new ConflictException('Cedula is already registered');
     }
 
-    const queryRunner = this.userRepository.manager.connection.createQueryRunner();
+    const queryRunner =
+      this.userRepository.manager.connection.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
 
@@ -97,7 +120,10 @@ export class UsersService implements OnModuleInit {
       const user = this.userRepository.create(userData);
       const savedUser = await queryRunner.manager.save(user);
 
-      const profile = this.userProfileRepository.create({ ...profileData, user: savedUser });
+      const profile = this.userProfileRepository.create({
+        ...profileData,
+        user: savedUser,
+      });
       await queryRunner.manager.save(profile);
 
       await queryRunner.commitTransaction();

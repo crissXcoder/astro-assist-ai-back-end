@@ -8,20 +8,27 @@ import { validate } from './config/env.validation';
 import { DatabaseModule } from './database/database.module';
 import { UsersModule } from './modules/users/users.module';
 import { AuthModule } from './modules/auth/auth.module';
-
+import { HealthModule } from './modules/health/health.module';
+import { SessionsModule } from './modules/sessions/sessions.module';
+import { AuditModule } from './modules/audit/audit.module';
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
       validate,
     }),
-    ThrottlerModule.forRoot([{
-      ttl: 60000,
-      limit: 100, // 100 requests per minute globally
-    }]),
+    ThrottlerModule.forRoot([
+      {
+        ttl: 60000,
+        limit: 100, // 100 requests per minute globally
+      },
+    ]),
     DatabaseModule,
     UsersModule,
     AuthModule,
+    HealthModule,
+    SessionsModule,
+    AuditModule,
   ],
   controllers: [AppController],
   providers: [AppService],

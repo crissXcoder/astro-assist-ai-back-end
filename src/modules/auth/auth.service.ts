@@ -20,19 +20,27 @@ export class AuthService {
   ) {}
 
   async register(registerDto: RegisterDto) {
-    const { email, password, cedula, fullName, birthDate, phone, ...addressData } = registerDto;
-    
+    const {
+      email,
+      password,
+      cedula,
+      fullName,
+      birthDate,
+      phone,
+      ...addressData
+    } = registerDto;
+
     const salt = await bcrypt.genSalt();
     const passwordHash = await bcrypt.hash(password, salt);
 
     const user = await this.usersService.create(
       { email, passwordHash },
-      { cedula, fullName, birthDate: new Date(birthDate), phone }
+      { cedula, fullName, birthDate: new Date(birthDate), phone },
     );
 
-    // Normally we would also save the address here by extending UsersService.create 
+    // Normally we would also save the address here by extending UsersService.create
     // or injecting AddressRepository here, but for now we keep it simple or update UsersService later.
-    
+
     return {
       message: 'User registered successfully',
       user: { id: user.id, email: user.email },
@@ -45,23 +53,32 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    const isPasswordValid = await bcrypt.compare(loginDto.password, user.passwordHash);
+    const isPasswordValid = await bcrypt.compare(
+      loginDto.password,
+      user.passwordHash,
+    );
     if (!isPasswordValid) {
       throw new UnauthorizedException('Invalid credentials');
     }
 
     const accessToken = this.jwtService.sign(
       { sub: user.id, email: user.email, role: user.role },
-      { secret: this.configService.get<string>('JWT_ACCESS_SECRET'), expiresIn: '15m' }
+      {
+        secret: this.configService.get<string>('JWT_ACCESS_SECRET'),
+        expiresIn: '15m',
+      },
     );
 
     const refreshToken = this.jwtService.sign(
       { sub: user.id },
-      { secret: this.configService.get<string>('JWT_REFRESH_SECRET'), expiresIn: '7d' }
+      {
+        secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
+        expiresIn: '7d',
+      },
     );
 
     const refreshTokenHash = await bcrypt.hash(refreshToken, 10);
-    
+
     const session = this.sessionRepository.create({
       user,
       refreshTokenHash,
@@ -69,14 +86,21 @@ export class AuthService {
       userAgent,
       ipHash: ip ? await bcrypt.hash(ip, 10) : undefined,
     });
-    
+
     await this.sessionRepository.save(session);
 
-    return { accessToken, refreshToken, user: { id: user.id, email: user.email, role: user.role } };
+    return {
+      accessToken,
+      refreshToken,
+      user: { id: user.id, email: user.email, role: user.role },
+    };
   }
 
   async logout(userId: string) {
-    await this.sessionRepository.update({ user: { id: userId } }, { isRevoked: true });
+    await this.sessionRepository.update(
+      { user: { id: userId } },
+      { isRevoked: true },
+    );
     return { message: 'Logged out successfully' };
   }
 }
