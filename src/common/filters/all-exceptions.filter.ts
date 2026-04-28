@@ -1,4 +1,10 @@
-import { ExceptionFilter, Catch, ArgumentsHost, HttpException, HttpStatus } from '@nestjs/common';
+import {
+  ExceptionFilter,
+  Catch,
+  ArgumentsHost,
+  HttpException,
+  HttpStatus,
+} from '@nestjs/common';
 import { Request, Response } from 'express';
 
 @Catch()
@@ -16,10 +22,12 @@ export class AllExceptionsFilter implements ExceptionFilter {
     if (exception instanceof HttpException) {
       status = exception.getStatus();
       const res = exception.getResponse() as any;
-      
+
       message = res.message || exception.message;
-      code = res.error ? res.error.replace(/\s+/g, '_').toUpperCase() : 'HTTP_ERROR';
-      
+      code = res.error
+        ? res.error.replace(/\s+/g, '_').toUpperCase()
+        : 'HTTP_ERROR';
+
       if (Array.isArray(res.message)) {
         message = 'Validation failed';
         code = 'VALIDATION_FAILED';
@@ -41,7 +49,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
       meta: {
         timestamp: new Date().toISOString(),
         path: request.url,
-      }
+      },
     });
   }
 }

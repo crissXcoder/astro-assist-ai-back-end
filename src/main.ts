@@ -9,17 +9,20 @@ import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
-  
+
   // Security Headers
   app.use(helmet());
-  
+
   // Cookie Parser
   app.use(cookieParser());
 
   // CORS Configuration
   const configService = app.get(ConfigService);
-  const frontendUrl = configService.get<string>('FRONTEND_URL', 'http://localhost:5173');
-  
+  const frontendUrl = configService.get<string>(
+    'FRONTEND_URL',
+    'http://localhost:5173',
+  );
+
   app.enableCors({
     origin: frontendUrl,
     credentials: true,
@@ -27,12 +30,14 @@ async function bootstrap() {
   });
 
   // Global Validation Pipe
-  app.useGlobalPipes(new ValidationPipe({
-    whitelist: true,
-    forbidNonWhitelisted: true,
-    transform: true,
-    transformOptions: { enableImplicitConversion: true }
-  }));
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+      transformOptions: { enableImplicitConversion: true },
+    }),
+  );
 
   // Global Exception Filter
   app.useGlobalFilters(new AllExceptionsFilter());
