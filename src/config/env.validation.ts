@@ -1,5 +1,11 @@
 import { plainToInstance } from 'class-transformer';
-import { IsEnum, IsNumber, IsString, validateSync, IsOptional } from 'class-validator';
+import {
+  IsEnum,
+  IsNumber,
+  IsString,
+  validateSync,
+  IsOptional,
+} from 'class-validator';
 
 export enum Environment {
   Development = 'development',
@@ -14,7 +20,7 @@ class EnvironmentVariables {
 
   @IsNumber()
   @IsOptional()
-  PORT: number = 3000;
+  PORT: number = 3001;
 
   @IsString()
   DB_HOST!: string;
@@ -39,15 +45,53 @@ class EnvironmentVariables {
 
   @IsString()
   FRONTEND_URL!: string;
+
+  @IsString()
+  @IsOptional()
+  JWT_ACCESS_EXPIRES_IN: string = '15m';
+
+  @IsString()
+  @IsOptional()
+  JWT_REFRESH_EXPIRES_IN: string = '7d';
+
+  @IsString()
+  @IsOptional()
+  COOKIE_DOMAIN: string = 'localhost';
+
+  @IsString()
+  @IsOptional()
+  CORS_ALLOWED_ORIGINS: string = 'http://localhost:3000,http://localhost:5173';
+
+  @IsString()
+  @IsOptional()
+  ADMIN_SEED_EMAIL!: string;
+
+  @IsString()
+  @IsOptional()
+  ADMIN_SEED_PASSWORD!: string;
+
+  // ── Nuevas variables de configuración global ────────
+
+  @IsString()
+  @IsOptional()
+  API_PREFIX: string = 'api';
+
+  @IsNumber()
+  @IsOptional()
+  THROTTLE_TTL: number = 60000;
+
+  @IsNumber()
+  @IsOptional()
+  THROTTLE_LIMIT: number = 100;
 }
 
 export function validate(config: Record<string, unknown>) {
-  const validatedConfig = plainToInstance(
-    EnvironmentVariables,
-    config,
-    { enableImplicitConversion: true },
-  );
-  const errors = validateSync(validatedConfig, { skipMissingProperties: false });
+  const validatedConfig = plainToInstance(EnvironmentVariables, config, {
+    enableImplicitConversion: true,
+  });
+  const errors = validateSync(validatedConfig, {
+    skipMissingProperties: false,
+  });
 
   if (errors.length > 0) {
     throw new Error(errors.toString());

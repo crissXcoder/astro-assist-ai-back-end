@@ -5,29 +5,33 @@ import { ConfigService } from '@nestjs/config';
 import { Request } from 'express';
 
 @Injectable()
-export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
+export class JwtRefreshStrategy extends PassportStrategy(
+  Strategy,
+  'jwt-refresh',
+) {
   constructor(private readonly configService: ConfigService) {
     super({
       jwtFromRequest: ExtractJwt.fromExtractors([
         (request: Request) => {
-          return request?.cookies?.access_token;
+          return request?.cookies?.refresh_token;
         },
       ]),
       ignoreExpiration: false,
-      secretOrKey: configService.get<string>('JWT_ACCESS_SECRET') || 'secret',
+      secretOrKey:
+        configService.get<string>('JWT_REFRESH_SECRET') || 'secret-refresh',
+      passReqToCallback: true,
     });
   }
 
-  async validate(payload: any) {
-    if (!payload) {
+  async validate(request: Request, payload: any) {
+    const refreshToken = request.cookies?.refresh_token;
+    if (!refreshToken || !payload) {
       throw new UnauthorizedException();
     }
-    // Payload contiene sub (userId), email, role, y sid (sessionId)
+
     return {
       id: payload.sub,
-      email: payload.email,
-      role: payload.role,
-      sessionId: payload.sid,
+      refreshToken,
     };
   }
 }
