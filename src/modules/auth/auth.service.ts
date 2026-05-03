@@ -8,6 +8,7 @@ import { UsersService } from '../users/users.service.js';
 import { Session } from './entities/session.entity.js';
 import { RegisterDto } from './dto/register.dto.js';
 import { LoginDto } from './dto/login.dto.js';
+import { SecurityEventsService, SecurityEventType } from '../sessions/security-events.service.js';
 import { ErrorCode } from '../../common/constants/error-codes.js';
 
 @Injectable()
@@ -18,6 +19,7 @@ export class AuthService {
     private readonly configService: ConfigService,
     @InjectRepository(Session)
     private readonly sessionRepository: Repository<Session>,
+    private readonly securityEventsService: SecurityEventsService,
   ) {}
 
   async register(registerDto: RegisterDto) {
@@ -135,11 +137,15 @@ export class AuthService {
     return tokens;
   }
 
-  async logout(sessionId: string) {
+  async logout(sessionId: string, userId: string) {
     await this.sessionRepository.update(
       { id: sessionId },
       { revokedAt: new Date() },
     );
+
+    this.securityEventsService.emit(userId, SecurityEventType.SESSION_REVOKED, {
+      sessionId,
+    });
   }
 
   async getActiveSessions(userId: string) {
@@ -156,6 +162,10 @@ export class AuthService {
     }
     session.revokedAt = new Date();
     await this.sessionRepository.save(session);
+
+    this.securityEventsService.emit(userId, SecurityEventType.SESSION_REVOKED, {
+      sessionId,
+    });
   }
 
   async revokeOtherSessions(userId: string, currentSessionId: string) {
@@ -168,6 +178,10 @@ export class AuthService {
         currentSessionId,
       })
       .execute();
+
+    this.securityEventsService.emit(userId, SecurityEventType.SESSIONS_UPDATED, {
+      action: 'REVOKED_OTHERS',
+    });
   }
 
   private async generateTokens(user: any, sessionId: string) {

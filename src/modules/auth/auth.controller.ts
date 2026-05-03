@@ -103,7 +103,7 @@ export class AuthController {
     @CurrentUser() user: any,
     @Res({ passthrough: true }) res: Response,
   ) {
-    await this.authService.logout(user.sessionId);
+    await this.authService.logout(user.sessionId, user.id);
     this.clearCookies(res);
     return { message: 'Sesión cerrada correctamente' };
   }
