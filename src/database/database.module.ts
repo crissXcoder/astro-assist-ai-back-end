@@ -29,7 +29,6 @@ import { Session } from '../modules/auth/entities/session.entity.js';
         };
       },
     }),
-    TypeOrmModule.forFeature([Session]),
   ],
   exports: [TypeOrmModule],
 })
