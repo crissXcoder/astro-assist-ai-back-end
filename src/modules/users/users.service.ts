@@ -1,11 +1,13 @@
 import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import { ConfigService } from '@nestjs/config';
 import { User } from './entities/user.entity.js';
 import { UserProfile } from './entities/user-profile.entity.js';
 import { Address } from './entities/address.entity.js';
+import { UserRepository } from './repositories/user.repository.js';
+import { UserProfileRepository } from './repositories/user-profile.repository.js';
+import { AddressRepository } from './repositories/address.repository.js';
 import { Role } from './enums/role.enum.js';
 import {
   SecurityEventsService,
@@ -13,6 +15,7 @@ import {
 } from '../sessions/security-events.service.js';
 import { NotFoundError, ConflictError } from '../../common/exceptions/index.js';
 import { ErrorCode } from '../../common/constants/error-codes.js';
+import { RegisterDto } from '@shared/dto/register.dto';
 
 /** Rounds de bcrypt. 12 es un buen balance seguridad/performance. */
 const BCRYPT_ROUNDS = 12;
@@ -22,12 +25,9 @@ export class UsersService implements OnModuleInit {
   private readonly logger = new Logger(UsersService.name);
 
   constructor(
-    @InjectRepository(User)
-    private readonly userRepository: Repository<User>,
-    @InjectRepository(UserProfile)
-    private readonly userProfileRepository: Repository<UserProfile>,
-    @InjectRepository(Address)
-    private readonly addressRepository: Repository<Address>,
+    private readonly userRepository: UserRepository,
+    private readonly userProfileRepository: UserProfileRepository,
+    private readonly addressRepository: AddressRepository,
     private readonly configService: ConfigService,
     private readonly dataSource: DataSource,
     private readonly securityEventsService: SecurityEventsService,
@@ -105,10 +105,7 @@ export class UsersService implements OnModuleInit {
   }
 
   async findById(id: string): Promise<User> {
-    const user = await this.userRepository.findOne({
-      where: { id },
-      relations: ['profile', 'addresses'],
-    });
+    const user = await this.userRepository.findByIdWithProfile(id);
 
     if (!user) {
       throw new NotFoundError({
@@ -125,40 +122,23 @@ export class UsersService implements OnModuleInit {
     limit = 10,
     search?: string,
   ): Promise<[User[], number]> {
-    const clampedLimit = Math.min(limit, 100);
-    const queryBuilder = this.userRepository
-      .createQueryBuilder('user')
-      .leftJoinAndSelect('user.profile', 'profile')
-      .where('user.role = :role', { role: Role.CUSTOMER })
-      .orderBy('user.createdAt', 'DESC')
-      .take(clampedLimit)
-      .skip((page - 1) * clampedLimit);
-
-    if (search && search.trim().length > 0) {
-      const searchTerm = `%${search.trim()}%`;
-      queryBuilder.andWhere(
-        '(user.email LIKE :search OR profile.fullName LIKE :search OR profile.cedula LIKE :search)',
-        { search: searchTerm },
-      );
-    }
-
-    return queryBuilder.getManyAndCount();
+    return this.userRepository.findAllPaginated(page, limit, search);
   }
 
   // ── Mutations ─────────────────────────────────────────
 
   /** Registro público de cliente */
-  async registerCustomer(
-    dto: import('./dto/user.dto.js').RegisterCustomerDto,
-  ): Promise<User> {
-    const { password, confirmPassword, address, ...profileData } = dto;
-
-    if (password !== confirmPassword) {
-      throw new ConflictError({
-        userMessage: 'Las contraseñas no coinciden.',
-        internalMessage: 'UsersService.registerCustomer: password mismatch',
-      });
-    }
+  async registerCustomer(dto: RegisterDto): Promise<User> {
+    const {
+      password,
+      province,
+      canton,
+      district,
+      town,
+      exactAddress,
+      postalCode,
+      ...profileData
+    } = dto;
 
     // Validar unicidad
     await this.validateUniqueness(dto.email, dto.cedula);
@@ -180,7 +160,12 @@ export class UsersService implements OnModuleInit {
       await manager.save(profile);
 
       const addr = manager.create(Address, {
-        ...address,
+        province,
+        canton,
+        district,
+        town,
+        exactAddress,
+        postalCode,
         userId: newUser.id,
         isDefault: true,
       });
