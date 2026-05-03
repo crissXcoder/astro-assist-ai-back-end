@@ -1,10 +1,13 @@
-import { Module } from '@nestjs/common';
+import { Global, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { Session } from '../modules/auth/entities/session.entity.js';
 
+@Global()
 @Module({
   imports: [
     TypeOrmModule.forRootAsync({
+      // ... (useFactory content remains the same)
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => {
@@ -20,15 +23,14 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
           password: configService.get<string>('DB_PASSWORD', ''),
           database: configService.get<string>('DB_DATABASE', 'astroassist_db'),
           autoLoadEntities: true,
-          // ── Desarrollo: recrea DB en cada reinicio ──────────
-          // Producción: SIEMPRE false. Usar migraciones explícitas.
           synchronize: isDev,
           dropSchema: isDev,
-          // ── Logging condicional ─────────────────────────────
           logging: isDev ? true : (['error', 'warn', 'migration'] as const),
         };
       },
     }),
+    TypeOrmModule.forFeature([Session]),
   ],
+  exports: [TypeOrmModule],
 })
 export class DatabaseModule {}

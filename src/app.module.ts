@@ -17,9 +17,6 @@ import { AdminModule } from './modules/admin/admin.module.js';
 import { RequestIdMiddleware } from './common/middleware/request-id.middleware.js';
 import { TransformResponseInterceptor } from './common/interceptors/transform-response.interceptor.js';
 
-import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard.js';
-import { RolesGuard } from './modules/auth/guards/roles.guard.js';
-
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -50,18 +47,6 @@ import { RolesGuard } from './modules/auth/guards/roles.guard.js';
     {
       provide: APP_GUARD,
       useClass: ThrottlerGuard,
-    },
-    // ── APP_GUARD: JwtAuthGuard global ───────────────
-    // Protege todos los endpoints por defecto. Usar @Public() para omitir.
-    {
-      provide: APP_GUARD,
-      useClass: JwtAuthGuard,
-    },
-    // ── APP_GUARD: RolesGuard global ────────────────
-    // Valida roles si el decorador @Roles() está presente.
-    {
-      provide: APP_GUARD,
-      useClass: RolesGuard,
     },
     // ── APP_INTERCEPTOR: TransformResponseInterceptor ─
     {
