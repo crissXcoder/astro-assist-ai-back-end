@@ -1,18 +1,17 @@
-import {
-  Injectable,
-  NotFoundException,
-  ConflictException,
-  OnModuleInit,
-  Logger,
-} from '@nestjs/common';
+import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import { ConfigService } from '@nestjs/config';
-import { User } from './entities/user.entity';
-import { UserProfile } from './entities/user-profile.entity';
-import { Address } from './entities/address.entity';
-import { Role } from './enums/role.enum';
+import { User } from './entities/user.entity.js';
+import { UserProfile } from './entities/user-profile.entity.js';
+import { Address } from './entities/address.entity.js';
+import { Role } from './enums/role.enum.js';
+import { NotFoundError, ConflictError } from '../../common/exceptions/index.js';
+import { ErrorCode } from '../../common/constants/error-codes.js';
+
+/** Rounds de bcrypt. 12 es un buen balance seguridad/performance. */
+const BCRYPT_ROUNDS = 12;
 
 @Injectable()
 export class UsersService implements OnModuleInit {
@@ -26,55 +25,75 @@ export class UsersService implements OnModuleInit {
     @InjectRepository(Address)
     private readonly addressRepository: Repository<Address>,
     private readonly configService: ConfigService,
+    private readonly dataSource: DataSource,
   ) {}
 
-  async onModuleInit() {
+  async onModuleInit(): Promise<void> {
     await this.seedAdmin();
   }
 
-  private async seedAdmin() {
-    try {
-      const adminEmail = this.configService.get<string>(
-        'ADMIN_SEED_EMAIL',
-        'admin@astroassist.com',
-      );
-      const adminPassword = this.configService.get<string>(
-        'ADMIN_SEED_PASSWORD',
-        'AstroAdmin123!',
-      );
+  // ── Seed Admin (Idempotente) ──────────────────────────
 
+  /**
+   * Crea el usuario administrador si no existe.
+   * Busca por email (no por rol) para soportar múltiples admins en futuro.
+   * Credenciales desde variables de entorno. Nunca hardcodeadas.
+   */
+  private async seedAdmin(): Promise<void> {
+    const adminEmail = this.configService.get<string>(
+      'ADMIN_SEED_EMAIL',
+      'admin@astroassist.com',
+    );
+    const adminPassword = this.configService.get<string>(
+      'ADMIN_SEED_PASSWORD',
+      'AstroAdmin123!',
+    );
+
+    try {
       const existingAdmin = await this.userRepository.findOne({
-        where: { role: Role.ADMIN },
+        where: { email: adminEmail },
       });
+
       if (existingAdmin) {
-        return; // Admin already exists
+        this.logger.log('Admin seed: usuario admin ya existe, omitiendo.');
+        return;
       }
 
-      const salt = await bcrypt.genSalt();
-      const passwordHash = await bcrypt.hash(adminPassword, salt);
+      const passwordHash = await bcrypt.hash(adminPassword, BCRYPT_ROUNDS);
 
-      const user = this.userRepository.create({
-        email: adminEmail,
-        passwordHash,
-        role: Role.ADMIN,
+      // Transacción: crear usuario + perfil atómicamente
+      // Patrón preferido per workspace_typeorm: dataSource.transaction()
+      await this.dataSource.transaction(async (manager) => {
+        const user = manager.create(User, {
+          email: adminEmail,
+          passwordHash,
+          role: Role.ADMIN,
+          isActive: true,
+          emailVerified: true, // Admin no necesita verificar email
+        });
+        const savedUser = await manager.save(user);
+
+        const profile = manager.create(UserProfile, {
+          userId: savedUser.id,
+          cedula: '000000000',
+          fullName: 'System Administrator',
+          birthDate: new Date('2000-01-01'),
+          phone: '00000000',
+        });
+        await manager.save(profile);
       });
 
-      const savedUser = await this.userRepository.save(user);
-
-      const profile = this.userProfileRepository.create({
-        user: savedUser,
-        cedula: '000000000',
-        fullName: 'System Administrator',
-        birthDate: new Date('2000-01-01'),
-        phone: '00000000',
-      });
-
-      await this.userProfileRepository.save(profile);
-      this.logger.log(`Admin seeded successfully with email: ${adminEmail}`);
-    } catch (error) {
-      this.logger.error('Failed to seed admin', error);
+      this.logger.log(
+        `Admin seed: usuario admin creado con email ${adminEmail}`,
+      );
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : 'Error desconocido';
+      this.logger.error(`Admin seed: falló la creación del admin — ${message}`);
     }
   }
+
+  // ── Queries ───────────────────────────────────────────
 
   async findByEmail(email: string): Promise<User | null> {
     return this.userRepository.findOne({ where: { email } });
@@ -85,54 +104,126 @@ export class UsersService implements OnModuleInit {
       where: { id },
       relations: ['profile', 'addresses'],
     });
+
     if (!user) {
-      throw new NotFoundException(`User with ID ${id} not found`);
+      throw new NotFoundError({
+        resource: 'usuario',
+        internalMessage: `UsersService.findById: no encontrado con id=${id}`,
+      });
     }
+
     return user;
   }
 
-  async create(
-    userData: Partial<User>,
-    profileData: Partial<UserProfile>,
-  ): Promise<User> {
-    if (!userData.email) {
-      throw new ConflictException('Email is required');
-    }
-    const existingUser = await this.findByEmail(userData.email);
-    if (existingUser) {
-      throw new ConflictException('Email is already registered');
-    }
-
-    // Check if cedula exists
-    const existingProfile = await this.userProfileRepository.findOne({
-      where: { cedula: profileData.cedula },
+  async findAllCustomers(page = 1, limit = 10): Promise<[User[], number]> {
+    return this.userRepository.findAndCount({
+      where: { role: Role.CUSTOMER },
+      relations: ['profile'],
+      take: limit,
+      skip: (page - 1) * limit,
+      order: { createdAt: 'DESC' },
     });
-    if (existingProfile) {
-      throw new ConflictException('Cedula is already registered');
+  }
+
+  // ── Mutations ─────────────────────────────────────────
+
+  /** Registro público de cliente */
+  async registerCustomer(dto: import('./dto/user.dto.js').RegisterCustomerDto): Promise<User> {
+    const { password, confirmPassword, address, ...profileData } = dto;
+
+    if (password !== confirmPassword) {
+      throw new ConflictError({
+        userMessage: 'Las contraseñas no coinciden.',
+        internalMessage: 'UsersService.registerCustomer: password mismatch',
+      });
     }
 
-    const queryRunner =
-      this.userRepository.manager.connection.createQueryRunner();
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
+    // Validar unicidad
+    await this.validateUniqueness(dto.email, dto.cedula);
 
-    try {
-      const user = this.userRepository.create(userData);
-      const savedUser = await queryRunner.manager.save(user);
+    const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
 
-      const profile = this.userProfileRepository.create({
-        ...profileData,
-        user: savedUser,
+    const savedUser = await this.dataSource.transaction(async (manager) => {
+      const user = manager.create(User, {
+        email: dto.email,
+        passwordHash,
+        role: Role.CUSTOMER,
       });
-      await queryRunner.manager.save(profile);
+      const newUser = await manager.save(user);
 
-      await queryRunner.commitTransaction();
-      return this.findById(savedUser.id);
-    } catch (err) {
-      await queryRunner.rollbackTransaction();
-      throw err;
-    } finally {
-      await queryRunner.release();
+      const profile = manager.create(UserProfile, {
+        ...profileData,
+        userId: newUser.id,
+      });
+      await manager.save(profile);
+
+      const addr = manager.create(Address, {
+        ...address,
+        userId: newUser.id,
+        isDefault: true,
+      });
+      await manager.save(addr);
+
+      return newUser;
+    });
+
+    return this.findById(savedUser.id);
+  }
+
+  /** Creación de cliente por administrador */
+  async createCustomerByAdmin(dto: import('./dto/user.dto.js').CreateCustomerByAdminDto): Promise<User> {
+    // Reutiliza lógica de registro pero podría tener variaciones (ej: emailVerified = true)
+    const user = await this.registerCustomer(dto);
+    
+    // Ejemplo: auto-verificar si es creado por admin
+    await this.userRepository.update(user.id, { emailVerified: true });
+    
+    return this.findById(user.id);
+  }
+
+  /** Actualización de perfil propio */
+  async updateMyProfile(userId: string, dto: import('./dto/user.dto.ts').UpdateMyProfileDto): Promise<User> {
+    const { address, ...profileData } = dto;
+
+    await this.dataSource.transaction(async (manager) => {
+      if (Object.keys(profileData).length > 0) {
+        await manager.update(UserProfile, { userId }, profileData);
+      }
+
+      if (address) {
+        // En este MVP asumimos que el usuario solo tiene una dirección principal
+        // O actualizamos la que es isDefault
+        const defaultAddress = await manager.findOne(Address, { where: { userId, isDefault: true } });
+        if (defaultAddress) {
+          await manager.update(Address, defaultAddress.id, address);
+        } else {
+          const newAddr = manager.create(Address, { ...address, userId, isDefault: true });
+          await manager.save(newAddr);
+        }
+      }
+    });
+
+    return this.findById(userId);
+  }
+
+  /** Auxiliar: Validar unicidad de email y cédula */
+  private async validateUniqueness(email: string, cedula: string): Promise<void> {
+    const existingEmail = await this.userRepository.findOne({ where: { email } });
+    if (existingEmail) {
+      throw new ConflictError({
+        errorCode: ErrorCode.USER_EMAIL_ALREADY_EXISTS,
+        userMessage: 'Este correo electrónico ya está registrado.',
+        internalMessage: `UsersService: email duplicado — ${email}`,
+      });
+    }
+
+    const existingCedula = await this.userProfileRepository.findOne({ where: { cedula } });
+    if (existingCedula) {
+      throw new ConflictError({
+        errorCode: ErrorCode.USER_ID_ALREADY_EXISTS,
+        userMessage: 'Esta cédula ya está registrada.',
+        internalMessage: `UsersService: cédula duplicada — ${cedula}`,
+      });
     }
   }
 }

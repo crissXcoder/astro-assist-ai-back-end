@@ -1,8 +1,18 @@
+/**
+ * DataSource para CLI de TypeORM.
+ *
+ * Uso (cuando se necesiten migraciones en producción):
+ *   npm run migration:generate -- src/database/migrations/NombreDescriptivo
+ *   npm run migration:run
+ *   npm run migration:revert
+ *
+ * En desarrollo se usa synchronize: true (ver DatabaseModule).
+ * Este archivo solo se usa para el CLI de migraciones.
+ */
 import { DataSource, DataSourceOptions } from 'typeorm';
 import { config } from 'dotenv';
 import { join } from 'path';
 
-// Load .env variables into process.env
 config();
 
 export const dataSourceOptions: DataSourceOptions = {
@@ -14,7 +24,7 @@ export const dataSourceOptions: DataSourceOptions = {
   database: process.env.DB_DATABASE || 'astroassist_db',
   entities: [join(__dirname, '../**/*.entity{.ts,.js}')],
   migrations: [join(__dirname, '../database/migrations/*{.ts,.js}')],
-  synchronize: false, // Strictly false for production
+  synchronize: false,
   logging: process.env.NODE_ENV === 'development',
 };
 

@@ -1,25 +1,25 @@
 import { Entity, Column, OneToOne, JoinColumn } from 'typeorm';
-import { BaseEntity } from '../../../database/base.entity';
-import { User } from './user.entity';
+import { BaseEntity } from '../../../database/base.entity.js';
+import { User } from './user.entity.js';
 
 @Entity('user_profiles')
 export class UserProfile extends BaseEntity {
-  @Column()
-  userId: string;
+  @Column({ type: 'varchar', length: 36 })
+  userId!: string;
 
   @OneToOne(() => User, (user) => user.profile, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'userId' })
-  user: User;
+  user!: User;
 
-  @Column({ unique: true })
-  cedula: string;
+  @Column({ type: 'varchar', length: 20, unique: true })
+  cedula!: string;
 
-  @Column()
-  fullName: string;
+  @Column({ type: 'varchar', length: 150 })
+  fullName!: string;
 
   @Column({ type: 'date' })
-  birthDate: Date;
+  birthDate!: Date;
 
-  @Column()
-  phone: string;
+  @Column({ type: 'varchar', length: 20 })
+  phone!: string;
 }
