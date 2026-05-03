@@ -5,9 +5,13 @@ import { UserProfile } from './entities/user-profile.entity';
 import { Address } from './entities/address.entity';
 import { UsersService } from './users.service';
 import { UsersController } from './users.controller';
+import { SessionsModule } from '../sessions/sessions.module.js';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([User, UserProfile, Address])],
+  imports: [
+    TypeOrmModule.forFeature([User, UserProfile, Address]),
+    SessionsModule,
+  ],
   providers: [UsersService],
   controllers: [UsersController],
   exports: [UsersService],

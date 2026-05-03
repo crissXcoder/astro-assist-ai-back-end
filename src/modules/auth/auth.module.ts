@@ -8,6 +8,7 @@ import { AuthController } from './auth.controller.js';
 import { JwtStrategy } from './strategies/jwt.strategy.js';
 import { JwtRefreshStrategy } from './strategies/jwt-refresh.strategy.js';
 import { UsersModule } from '../users/users.module.js';
+import { SessionsModule } from '../sessions/sessions.module.js';
 import { Session } from './entities/session.entity.js';
 
 import { JwtAuthGuard } from './guards/jwt-auth.guard.js';
@@ -16,6 +17,7 @@ import { RolesGuard } from './guards/roles.guard.js';
 @Module({
   imports: [
     UsersModule,
+    SessionsModule,
     PassportModule,
     TypeOrmModule.forFeature([Session]),
     JwtModule.registerAsync({

@@ -7,6 +7,7 @@ import { User } from './entities/user.entity.js';
 import { UserProfile } from './entities/user-profile.entity.js';
 import { Address } from './entities/address.entity.js';
 import { Role } from './enums/role.enum.js';
+import { SecurityEventsService, SecurityEventType } from '../sessions/security-events.service.js';
 import { NotFoundError, ConflictError } from '../../common/exceptions/index.js';
 import { ErrorCode } from '../../common/constants/error-codes.js';
 
@@ -26,6 +27,7 @@ export class UsersService implements OnModuleInit {
     private readonly addressRepository: Repository<Address>,
     private readonly configService: ConfigService,
     private readonly dataSource: DataSource,
+    private readonly securityEventsService: SecurityEventsService,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -256,6 +258,13 @@ export class UsersService implements OnModuleInit {
     const user = await this.findById(id);
     user.isActive = isActive;
     await this.userRepository.save(user);
+
+    if (!isActive) {
+      this.securityEventsService.emit(id, SecurityEventType.FORCE_LOGOUT, {
+        reason: 'Tu cuenta ha sido desactivada por un administrador.',
+      });
+    }
+
     return user;
   }
 
@@ -277,6 +286,10 @@ export class UsersService implements OnModuleInit {
           await manager.save(newAddr);
         }
       }
+    });
+
+    this.securityEventsService.emit(userId, SecurityEventType.PROFILE_UPDATED, {
+      updatedAt: new Date(),
     });
 
     return this.findById(userId);
