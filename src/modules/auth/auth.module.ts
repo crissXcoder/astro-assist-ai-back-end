@@ -3,6 +3,7 @@ import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { APP_GUARD } from '@nestjs/core';
 import { AuthService } from './auth.service.js';
 import { AuthController } from './auth.controller.js';
 import { JwtStrategy } from './strategies/jwt.strategy.js';
@@ -19,7 +20,6 @@ import { RolesGuard } from './guards/roles.guard.js';
     UsersModule,
     SessionsModule,
     PassportModule,
-    TypeOrmModule.forFeature([Session]),
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
@@ -35,6 +35,14 @@ import { RolesGuard } from './guards/roles.guard.js';
     JwtRefreshStrategy,
     JwtAuthGuard,
     RolesGuard,
+    {
+      provide: APP_GUARD,
+      useExisting: JwtAuthGuard,
+    },
+    {
+      provide: APP_GUARD,
+      useExisting: RolesGuard,
+    },
   ],
   controllers: [AuthController],
   exports: [AuthService, JwtAuthGuard, RolesGuard],
