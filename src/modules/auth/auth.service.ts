@@ -20,26 +20,28 @@ export class AuthService {
   ) {}
 
   async register(registerDto: RegisterDto) {
-    const {
-      email,
-      password,
-      cedula,
-      fullName,
-      birthDate,
-      phone,
-      ...addressData
+    const { 
+      email, password, cedula, fullName, birthDate, phone,
+      province, canton, district, city, exactAddress, postalCode 
     } = registerDto;
 
-    const salt = await bcrypt.genSalt();
-    const passwordHash = await bcrypt.hash(password, salt);
-
-    const user = await this.usersService.create(
-      { email, passwordHash },
-      { cedula, fullName, birthDate: new Date(birthDate), phone },
-    );
-
-    // Normally we would also save the address here by extending UsersService.create
-    // or injecting AddressRepository here, but for now we keep it simple or update UsersService later.
+    const user = await this.usersService.registerCustomer({
+      email,
+      password,
+      confirmPassword: password, // In this legacy endpoint we assume they match
+      cedula,
+      fullName,
+      birthDate: new Date(birthDate),
+      phone,
+      address: {
+        province,
+        canton,
+        district,
+        town: city,
+        exactAddress,
+        postalCode,
+      },
+    });
 
     return {
       message: 'User registered successfully',
@@ -84,7 +86,7 @@ export class AuthService {
       refreshTokenHash,
       expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
       userAgent,
-      ipHash: ip ? await bcrypt.hash(ip, 10) : undefined,
+      ipAddress: ip ?? undefined,
     });
 
     await this.sessionRepository.save(session);
@@ -99,7 +101,7 @@ export class AuthService {
   async logout(userId: string) {
     await this.sessionRepository.update(
       { user: { id: userId } },
-      { isRevoked: true },
+      { revokedAt: new Date() },
     );
     return { message: 'Logged out successfully' };
   }

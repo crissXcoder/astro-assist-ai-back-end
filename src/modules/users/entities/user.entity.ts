@@ -1,30 +1,46 @@
-import { Entity, Column, OneToOne, OneToMany } from 'typeorm';
-import { BaseEntity } from '../../../database/base.entity';
-import { Role } from '../enums/role.enum';
-import { UserProfile } from './user-profile.entity';
-import { Address } from './address.entity';
-import { Session } from '../../auth/entities/session.entity';
+import { Entity, Column, Index, OneToOne, OneToMany } from 'typeorm';
+import { BaseEntity } from '../../../database/base.entity.js';
+import { Role } from '../enums/role.enum.js';
+import { UserProfile } from './user-profile.entity.js';
+import { Address } from './address.entity.js';
+import { Session } from '../../auth/entities/session.entity.js';
 
 @Entity('users')
 export class User extends BaseEntity {
-  @Column({ unique: true })
-  email: string;
+  @Index('IDX_users_email', { unique: true })
+  @Column({ type: 'varchar', length: 255, unique: true })
+  email!: string;
 
-  @Column()
-  passwordHash: string;
+  @Column({ type: 'varchar', length: 255 })
+  passwordHash!: string;
 
   @Column({ type: 'enum', enum: Role, default: Role.CUSTOMER })
-  role: Role;
+  role!: Role;
 
-  @Column({ default: true })
-  isActive: boolean;
+  @Column({ type: 'tinyint', width: 1, default: 1 })
+  isActive!: boolean;
 
-  @OneToOne(() => UserProfile, (profile) => profile.user, { cascade: true })
-  profile: UserProfile;
+  @Column({ type: 'tinyint', width: 1, default: 0 })
+  emailVerified!: boolean;
 
-  @OneToMany(() => Address, (address) => address.user, { cascade: true })
-  addresses: Address[];
+  @Column({ type: 'timestamp', nullable: true, default: null })
+  lastLoginAt!: Date | null;
 
-  @OneToMany(() => Session, (session) => session.user, { cascade: true })
-  sessions: Session[];
+  // ── Relaciones ──────────────────────────────────────
+
+  /** 1:1 → UserProfile. Cascade solo insert (crear perfil junto con usuario). */
+  @OneToOne(() => UserProfile, (profile) => profile.user, {
+    cascade: ['insert'],
+  })
+  profile!: UserProfile;
+
+  /** 1:N → Address. Cascade solo insert (crear direcciones desde registro). */
+  @OneToMany(() => Address, (address) => address.user, {
+    cascade: ['insert'],
+  })
+  addresses!: Address[];
+
+  /** 1:N → Session. Sin cascade (sesiones se gestionan independientemente). */
+  @OneToMany(() => Session, (session) => session.user)
+  sessions!: Session[];
 }
