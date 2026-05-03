@@ -1,14 +1,14 @@
-import { 
-  IsEmail, 
-  IsString, 
-  IsNotEmpty, 
-  MinLength, 
-  MaxLength, 
-  IsDate, 
-  IsPhoneNumber, 
-  IsOptional, 
-  Matches, 
-  ValidateNested
+import {
+  IsEmail,
+  IsString,
+  IsNotEmpty,
+  MinLength,
+  MaxLength,
+  IsDate,
+  IsPhoneNumber,
+  IsOptional,
+  Matches,
+  ValidateNested,
 } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
 
@@ -66,13 +66,16 @@ export class AddressDto {
 
 export class RegisterCustomerDto {
   @IsEmail({}, { message: 'El correo electrónico no es válido' })
-  @Transform(({ value }) => (typeof value === 'string' ? value.trim().toLowerCase() : value))
+  @Transform(({ value }) =>
+    typeof value === 'string' ? value.trim().toLowerCase() : value,
+  )
   email!: string;
 
   @IsString()
   @MinLength(8, { message: 'La contraseña debe tener al menos 8 caracteres' })
   @Matches(/((?=.*\d)|(?=.*\W+))(?![.\n])(?=.*[A-Z])(?=.*[a-z]).*$/, {
-    message: 'La contraseña es demasiado débil (debe incluir mayúscula, minúscula y número/símbolo)',
+    message:
+      'La contraseña es demasiado débil (debe incluir mayúscula, minúscula y número/símbolo)',
   })
   password!: string;
 
@@ -97,7 +100,9 @@ export class RegisterCustomerDto {
 
   @IsString()
   @IsNotEmpty()
-  @Matches(/^[2|4|6|8]\d{7}$/, { message: 'El número de teléfono no es válido para Costa Rica' })
+  @Matches(/^[2|4|6|8]\d{7}$/, {
+    message: 'El número de teléfono no es válido para Costa Rica',
+  })
   phone!: string;
 
   @ValidateNested()
@@ -116,7 +121,9 @@ export class UpdateMyProfileDto {
 
   @IsString()
   @IsOptional()
-  @Matches(/^[2|4|6|8]\d{7}$/, { message: 'El número de teléfono no es válido para Costa Rica' })
+  @Matches(/^[2|4|6|8]\d{7}$/, {
+    message: 'El número de teléfono no es válido para Costa Rica',
+  })
   phone?: string;
 
   @IsOptional()
@@ -128,7 +135,9 @@ export class UpdateMyProfileDto {
 export class UpdateCustomerByAdminDto extends UpdateMyProfileDto {
   @IsEmail()
   @IsOptional()
-  @Transform(({ value }) => (typeof value === 'string' ? value.trim().toLowerCase() : value))
+  @Transform(({ value }) =>
+    typeof value === 'string' ? value.trim().toLowerCase() : value,
+  )
   email?: string;
 
   @IsString()

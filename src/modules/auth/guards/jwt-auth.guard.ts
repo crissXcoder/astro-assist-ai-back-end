@@ -1,7 +1,7 @@
-import { 
-  ExecutionContext, 
-  Injectable, 
-  UnauthorizedException 
+import {
+  ExecutionContext,
+  Injectable,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { Reflector } from '@nestjs/core';
@@ -57,7 +57,8 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
       if (!session || session.expiresAt < new Date()) {
         throw new UnauthorizedException({
           errorCode: ErrorCode.AUTH_SESSION_EXPIRED,
-          userMessage: 'Tu sesión ha expirado o ha sido revocada. Inicia sesión de nuevo.',
+          userMessage:
+            'Tu sesión ha expirado o ha sido revocada. Inicia sesión de nuevo.',
         });
       }
     }

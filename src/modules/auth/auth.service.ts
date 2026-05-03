@@ -8,7 +8,10 @@ import { UsersService } from '../users/users.service.js';
 import { Session } from './entities/session.entity.js';
 import { RegisterDto } from './dto/register.dto.js';
 import { LoginDto } from './dto/login.dto.js';
-import { SecurityEventsService, SecurityEventType } from '../sessions/security-events.service.js';
+import {
+  SecurityEventsService,
+  SecurityEventType,
+} from '../sessions/security-events.service.js';
 import { ErrorCode } from '../../common/constants/error-codes.js';
 
 @Injectable()
@@ -23,9 +26,19 @@ export class AuthService {
   ) {}
 
   async register(registerDto: RegisterDto) {
-    const { 
-      email, password, cedula, fullName, birthDate, phone,
-      province, canton, district, city, exactAddress, postalCode 
+    const {
+      email,
+      password,
+      cedula,
+      fullName,
+      birthDate,
+      phone,
+      province,
+      canton,
+      district,
+      city,
+      exactAddress,
+      postalCode,
     } = registerDto;
 
     // registerCustomer ya valida unicidad de email/cédula
@@ -52,7 +65,7 @@ export class AuthService {
 
   async login(loginDto: LoginDto, userAgent?: string, ip?: string) {
     const user = await this.usersService.findByEmail(loginDto.email);
-    
+
     // Error genérico para no revelar existencia de email
     const invalidCredentialsError = new UnauthorizedException({
       errorCode: ErrorCode.AUTH_INVALID_CREDENTIALS,
@@ -92,7 +105,12 @@ export class AuthService {
     return { ...tokens, user };
   }
 
-  async refresh(userId: string, refreshToken: string, userAgent?: string, ip?: string) {
+  async refresh(
+    userId: string,
+    refreshToken: string,
+    userAgent?: string,
+    ip?: string,
+  ) {
     const user = await this.usersService.findById(userId);
     if (!user || !user.isActive) {
       throw new UnauthorizedException({
@@ -127,11 +145,14 @@ export class AuthService {
     const tokens = await this.generateTokens(user, currentSession.id);
 
     // Actualizar sesión con nuevo hash y metadatos
-    currentSession.refreshTokenHash = await bcrypt.hash(tokens.refreshToken, 10);
+    currentSession.refreshTokenHash = await bcrypt.hash(
+      tokens.refreshToken,
+      10,
+    );
     currentSession.lastUsedAt = new Date();
     currentSession.userAgent = userAgent || currentSession.userAgent;
     currentSession.ipAddress = ip || currentSession.ipAddress;
-    
+
     await this.sessionRepository.save(currentSession);
 
     return tokens;
@@ -156,7 +177,10 @@ export class AuthService {
   }
 
   async revokeSession(userId: string, sessionId: string) {
-    const session = await this.sessionRepository.findOneBy({ id: sessionId, userId });
+    const session = await this.sessionRepository.findOneBy({
+      id: sessionId,
+      userId,
+    });
     if (!session) {
       throw new UnauthorizedException('Sesión no encontrada.');
     }
@@ -173,24 +197,31 @@ export class AuthService {
       .createQueryBuilder()
       .update(Session)
       .set({ revokedAt: new Date() })
-      .where('userId = :userId AND id != :currentSessionId AND revokedAt IS NULL', {
-        userId,
-        currentSessionId,
-      })
+      .where(
+        'userId = :userId AND id != :currentSessionId AND revokedAt IS NULL',
+        {
+          userId,
+          currentSessionId,
+        },
+      )
       .execute();
 
-    this.securityEventsService.emit(userId, SecurityEventType.SESSIONS_UPDATED, {
-      action: 'REVOKED_OTHERS',
-    });
+    this.securityEventsService.emit(
+      userId,
+      SecurityEventType.SESSIONS_UPDATED,
+      {
+        action: 'REVOKED_OTHERS',
+      },
+    );
   }
 
   private async generateTokens(user: any, sessionId: string) {
     const accessToken = this.jwtService.sign(
-      { 
-        sub: user.id, 
-        email: user.email, 
+      {
+        sub: user.id,
+        email: user.email,
         role: user.role,
-        sid: sessionId 
+        sid: sessionId,
       },
       {
         secret: this.configService.get<string>('JWT_ACCESS_SECRET'),
