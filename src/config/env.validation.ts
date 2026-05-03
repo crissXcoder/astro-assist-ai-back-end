@@ -20,7 +20,7 @@ class EnvironmentVariables {
 
   @IsNumber()
   @IsOptional()
-  PORT: number = 3000;
+  PORT: number = 3001;
 
   @IsString()
   DB_HOST!: string;
@@ -69,6 +69,20 @@ class EnvironmentVariables {
   @IsString()
   @IsOptional()
   ADMIN_SEED_PASSWORD!: string;
+
+  // ── Nuevas variables de configuración global ────────
+
+  @IsString()
+  @IsOptional()
+  API_PREFIX: string = 'api';
+
+  @IsNumber()
+  @IsOptional()
+  THROTTLE_TTL: number = 60000;
+
+  @IsNumber()
+  @IsOptional()
+  THROTTLE_LIMIT: number = 100;
 }
 
 export function validate(config: Record<string, unknown>) {
