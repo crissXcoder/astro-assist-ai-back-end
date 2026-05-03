@@ -1,9 +1,33 @@
-import { IsBoolean, IsEmail, IsEnum, IsOptional, IsString, MinLength } from 'class-validator';
-import { Role } from '../../users/enums/role.enum.js';
+import {
+  IsBoolean,
+  IsEmail,
+  IsOptional,
+  IsString,
+  MaxLength,
+  Matches,
+  MinLength,
+} from 'class-validator';
+import { Transform } from 'class-transformer';
 
+/**
+ * Normalización de Strings.
+ */
+function NormalizeString({ value }: { value: unknown }): unknown {
+  if (typeof value !== 'string') return value;
+  return value.trim().replace(/\s+/g, ' ');
+}
+
+/**
+ * DTO para actualización de cliente por administrador.
+ * Sin campo `role`: no se puede cambiar el rol desde UI.
+ * Edición básica: nombre, email, teléfono, contraseña, estado.
+ */
 export class UpdateUserByAdminDto {
   @IsEmail({}, { message: 'Email inválido.' })
   @IsOptional()
+  @Transform(({ value }) =>
+    typeof value === 'string' ? value.trim().toLowerCase() : value,
+  )
   email?: string;
 
   @IsString()
@@ -11,13 +35,18 @@ export class UpdateUserByAdminDto {
   @IsOptional()
   password?: string;
 
-  @IsEnum(Role, { message: 'Rol inválido.' })
+  @IsString()
   @IsOptional()
-  role?: Role;
+  @MaxLength(150)
+  @Transform(NormalizeString)
+  fullName?: string;
 
   @IsString()
   @IsOptional()
-  fullName?: string;
+  @Matches(/^[2|4|6|8]\d{7}$/, {
+    message: 'El número de teléfono no es válido para Costa Rica.',
+  })
+  phone?: string;
 
   @IsBoolean()
   @IsOptional()

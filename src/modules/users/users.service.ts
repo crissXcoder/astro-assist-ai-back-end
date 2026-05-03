@@ -7,7 +7,10 @@ import { User } from './entities/user.entity.js';
 import { UserProfile } from './entities/user-profile.entity.js';
 import { Address } from './entities/address.entity.js';
 import { Role } from './enums/role.enum.js';
-import { SecurityEventsService, SecurityEventType } from '../sessions/security-events.service.js';
+import {
+  SecurityEventsService,
+  SecurityEventType,
+} from '../sessions/security-events.service.js';
 import { NotFoundError, ConflictError } from '../../common/exceptions/index.js';
 import { ErrorCode } from '../../common/constants/error-codes.js';
 
@@ -117,19 +120,37 @@ export class UsersService implements OnModuleInit {
     return user;
   }
 
-  async findAllPaginated(page = 1, limit = 10): Promise<[User[], number]> {
-    return this.userRepository.findAndCount({
-      relations: ['profile'],
-      take: limit,
-      skip: (page - 1) * limit,
-      order: { createdAt: 'DESC' },
-    });
+  async findAllPaginated(
+    page = 1,
+    limit = 10,
+    search?: string,
+  ): Promise<[User[], number]> {
+    const clampedLimit = Math.min(limit, 100);
+    const queryBuilder = this.userRepository
+      .createQueryBuilder('user')
+      .leftJoinAndSelect('user.profile', 'profile')
+      .where('user.role = :role', { role: Role.CUSTOMER })
+      .orderBy('user.createdAt', 'DESC')
+      .take(clampedLimit)
+      .skip((page - 1) * clampedLimit);
+
+    if (search && search.trim().length > 0) {
+      const searchTerm = `%${search.trim()}%`;
+      queryBuilder.andWhere(
+        '(user.email LIKE :search OR profile.fullName LIKE :search OR profile.cedula LIKE :search)',
+        { search: searchTerm },
+      );
+    }
+
+    return queryBuilder.getManyAndCount();
   }
 
   // ── Mutations ─────────────────────────────────────────
 
   /** Registro público de cliente */
-  async registerCustomer(dto: import('./dto/user.dto.js').RegisterCustomerDto): Promise<User> {
+  async registerCustomer(
+    dto: import('./dto/user.dto.js').RegisterCustomerDto,
+  ): Promise<User> {
     const { password, confirmPassword, address, ...profileData } = dto;
 
     if (password !== confirmPassword) {
@@ -171,20 +192,27 @@ export class UsersService implements OnModuleInit {
     return this.findById(savedUser.id);
   }
 
-  /** Creación de cliente por administrador */
-  async createCustomerByAdmin(dto: import('./dto/user.dto.js').CreateCustomerByAdminDto): Promise<User> {
-    // Reutiliza lógica de registro pero podría tener variaciones (ej: emailVerified = true)
-    const user = await this.registerCustomer(dto);
-    
-    // Ejemplo: auto-verificar si es creado por admin
-    await this.userRepository.update(user.id, { emailVerified: true });
-    
-    return this.findById(user.id);
-  }
+  /** Creación de cliente por administrador. Siempre crea CUSTOMER. */
+  async createByAdmin(
+    dto: import('../admin/dto/create-user-by-admin.dto.js').CreateUserByAdminDto,
+  ): Promise<User> {
+    const {
+      email,
+      password,
+      confirmPassword,
+      cedula,
+      fullName,
+      birthDate,
+      phone,
+      address,
+    } = dto;
 
-  /** Creación de usuario por administrador */
-  async createByAdmin(dto: import('../admin/dto/create-user-by-admin.dto.js').CreateUserByAdminDto): Promise<User> {
-    const { email, password, role, cedula, fullName } = dto;
+    if (password !== confirmPassword) {
+      throw new ConflictError({
+        userMessage: 'Las contraseñas no coinciden.',
+        internalMessage: 'UsersService.createByAdmin: password mismatch',
+      });
+    }
 
     // Validar unicidad
     await this.validateUniqueness(email, cedula);
@@ -195,9 +223,9 @@ export class UsersService implements OnModuleInit {
       const user = manager.create(User, {
         email,
         passwordHash,
-        role,
+        role: Role.CUSTOMER, // Siempre CUSTOMER, nunca aceptar desde input
         isActive: true,
-        emailVerified: true,
+        emailVerified: true, // Admin lo crea verificado
       });
       const newUser = await manager.save(user);
 
@@ -205,10 +233,17 @@ export class UsersService implements OnModuleInit {
         userId: newUser.id,
         cedula,
         fullName,
-        birthDate: new Date('2000-01-01'), // Default for admin creation
-        phone: '00000000', // Default
+        birthDate,
+        phone,
       });
       await manager.save(profile);
+
+      const addr = manager.create(Address, {
+        ...address,
+        userId: newUser.id,
+        isDefault: true,
+      });
+      await manager.save(addr);
 
       return newUser;
     });
@@ -216,9 +251,12 @@ export class UsersService implements OnModuleInit {
     return this.findById(savedUser.id);
   }
 
-  /** Actualización de usuario por administrador */
-  async updateByAdmin(id: string, dto: import('../admin/dto/update-user-by-admin.dto.js').UpdateUserByAdminDto): Promise<User> {
-    const { email, password, role, fullName, isActive } = dto;
+  /** Actualización de cliente por administrador. No permite cambiar rol. */
+  async updateByAdmin(
+    id: string,
+    dto: import('../admin/dto/update-user-by-admin.dto.js').UpdateUserByAdminDto,
+  ): Promise<User> {
+    const { email, password, fullName, phone, isActive } = dto;
     const user = await this.findById(id);
 
     if (email && email !== user.email) {
@@ -236,18 +274,19 @@ export class UsersService implements OnModuleInit {
       user.passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
     }
 
-    if (role) {
-      user.role = role;
-    }
-
     if (isActive !== undefined) {
       user.isActive = isActive;
     }
 
     await this.userRepository.save(user);
 
-    if (fullName) {
-      await this.userProfileRepository.update({ userId: id }, { fullName });
+    // Actualizar campos de perfil si se proporcionaron
+    const profileUpdates: Partial<{ fullName: string; phone: string }> = {};
+    if (fullName) profileUpdates.fullName = fullName;
+    if (phone) profileUpdates.phone = phone;
+
+    if (Object.keys(profileUpdates).length > 0) {
+      await this.userProfileRepository.update({ userId: id }, profileUpdates);
     }
 
     return this.findById(id);
@@ -269,7 +308,10 @@ export class UsersService implements OnModuleInit {
   }
 
   /** Actualización de perfil propio */
-  async updateMyProfile(userId: string, dto: import('./dto/user.dto.js').UpdateMyProfileDto): Promise<User> {
+  async updateMyProfile(
+    userId: string,
+    dto: import('./dto/user.dto.js').UpdateMyProfileDto,
+  ): Promise<User> {
     const { address, ...profileData } = dto;
 
     await this.dataSource.transaction(async (manager) => {
@@ -278,11 +320,17 @@ export class UsersService implements OnModuleInit {
       }
 
       if (address) {
-        const defaultAddress = await manager.findOne(Address, { where: { userId, isDefault: true } });
+        const defaultAddress = await manager.findOne(Address, {
+          where: { userId, isDefault: true },
+        });
         if (defaultAddress) {
           await manager.update(Address, defaultAddress.id, address);
         } else {
-          const newAddr = manager.create(Address, { ...address, userId, isDefault: true });
+          const newAddr = manager.create(Address, {
+            ...address,
+            userId,
+            isDefault: true,
+          });
           await manager.save(newAddr);
         }
       }
@@ -296,8 +344,13 @@ export class UsersService implements OnModuleInit {
   }
 
   /** Auxiliar: Validar unicidad de email y cédula */
-  private async validateUniqueness(email: string, cedula: string): Promise<void> {
-    const existingEmail = await this.userRepository.findOne({ where: { email } });
+  private async validateUniqueness(
+    email: string,
+    cedula: string,
+  ): Promise<void> {
+    const existingEmail = await this.userRepository.findOne({
+      where: { email },
+    });
     if (existingEmail) {
       throw new ConflictError({
         errorCode: ErrorCode.USER_EMAIL_ALREADY_EXISTS,
@@ -306,7 +359,9 @@ export class UsersService implements OnModuleInit {
       });
     }
 
-    const existingCedula = await this.userProfileRepository.findOne({ where: { cedula } });
+    const existingCedula = await this.userProfileRepository.findOne({
+      where: { cedula },
+    });
     if (existingCedula) {
       throw new ConflictError({
         errorCode: ErrorCode.USER_ID_ALREADY_EXISTS,

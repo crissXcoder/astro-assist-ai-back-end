@@ -30,8 +30,8 @@ import { RolesGuard } from './guards/roles.guard.js';
     }),
   ],
   providers: [
-    AuthService, 
-    JwtStrategy, 
+    AuthService,
+    JwtStrategy,
     JwtRefreshStrategy,
     JwtAuthGuard,
     RolesGuard,

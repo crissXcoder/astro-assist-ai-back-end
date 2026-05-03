@@ -1,13 +1,15 @@
-import { 
-  Controller, 
-  Get, 
-  Post, 
-  Patch, 
-  Body, 
-  Param, 
-  UseGuards, 
+import {
+  Controller,
+  Get,
+  Post,
+  Patch,
+  Body,
+  Param,
+  UseGuards,
   ParseUUIDPipe,
-  Query
+  Query,
+  HttpCode,
+  HttpStatus,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard.js';
 import { RolesGuard } from '../auth/guards/roles.guard.js';
@@ -29,46 +31,66 @@ export class AdminUsersController {
   async findAll(
     @Query('page') page: number = 1,
     @Query('limit') limit: number = 10,
+    @Query('search') search?: string,
   ) {
-    const [users, total] = await this.usersService.findAllPaginated(page, limit);
+    const [users, total] = await this.usersService.findAllPaginated(
+      page,
+      limit,
+      search,
+    );
     return {
-      data: plainToInstance(UserResponseDto, users, { excludeExtraneousValues: true }),
+      data: plainToInstance(UserResponseDto, users, {
+        excludeExtraneousValues: true,
+      }),
       meta: {
         total,
-        page,
-        limit,
-        totalPages: Math.ceil(total / limit),
+        page: Number(page),
+        limit: Number(limit),
+        totalPages: Math.ceil(total / Number(limit)),
       },
     };
   }
 
   @Post()
-  async create(@Body() createUserDto: CreateUserByAdminDto) {
+  @HttpCode(HttpStatus.CREATED)
+  async create(
+    @Body() createUserDto: CreateUserByAdminDto,
+  ): Promise<UserResponseDto> {
     const user = await this.usersService.createByAdmin(createUserDto);
-    return plainToInstance(UserResponseDto, user, { excludeExtraneousValues: true });
+    return plainToInstance(UserResponseDto, user, {
+      excludeExtraneousValues: true,
+    });
   }
 
   @Get(':id')
-  async findOne(@Param('id', ParseUUIDPipe) id: string) {
+  async findOne(
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<UserResponseDto> {
     const user = await this.usersService.findById(id);
-    return plainToInstance(UserResponseDto, user, { excludeExtraneousValues: true });
+    return plainToInstance(UserResponseDto, user, {
+      excludeExtraneousValues: true,
+    });
   }
 
   @Patch(':id')
   async update(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() updateUserDto: UpdateUserByAdminDto,
-  ) {
+  ): Promise<UserResponseDto> {
     const user = await this.usersService.updateByAdmin(id, updateUserDto);
-    return plainToInstance(UserResponseDto, user, { excludeExtraneousValues: true });
+    return plainToInstance(UserResponseDto, user, {
+      excludeExtraneousValues: true,
+    });
   }
 
   @Patch(':id/status')
   async updateStatus(
     @Param('id', ParseUUIDPipe) id: string,
     @Body('isActive') isActive: boolean,
-  ) {
+  ): Promise<UserResponseDto> {
     const user = await this.usersService.updateStatus(id, isActive);
-    return plainToInstance(UserResponseDto, user, { excludeExtraneousValues: true });
+    return plainToInstance(UserResponseDto, user, {
+      excludeExtraneousValues: true,
+    });
   }
 }

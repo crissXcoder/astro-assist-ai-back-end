@@ -12,7 +12,9 @@ export class SessionsController {
    * Requiere autenticación activa.
    */
   @Sse('stream')
-  stream(@CurrentUser() user: { id: string }): Observable<{ data: object; type: string }> {
+  stream(
+    @CurrentUser() user: { id: string },
+  ): Observable<{ data: object; type: string }> {
     return this.securityEventsService.subscribeToUserEvents(user.id);
   }
 }

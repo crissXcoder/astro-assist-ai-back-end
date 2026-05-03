@@ -16,7 +16,9 @@ export interface SecurityEventPayload {
   [SecurityEventType.PROFILE_UPDATED]: { updatedAt: Date };
 }
 
-export interface SecurityEvent<T extends SecurityEventType = SecurityEventType> {
+export interface SecurityEvent<
+  T extends SecurityEventType = SecurityEventType,
+> {
   userId: string;
   type: T;
   payload: SecurityEventPayload[T];
@@ -41,7 +43,9 @@ export class SecurityEventsService {
    * Retorna un observable filtrado por el ID del usuario.
    * Transforma el evento interno al formato esperado por SSE (MessageEvent).
    */
-  subscribeToUserEvents(userId: string): Observable<{ data: object; type: string }> {
+  subscribeToUserEvents(
+    userId: string,
+  ): Observable<{ data: object; type: string }> {
     return this.eventSubject.asObservable().pipe(
       filter((event) => event.userId === userId),
       map((event) => ({

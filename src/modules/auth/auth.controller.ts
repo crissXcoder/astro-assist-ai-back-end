@@ -38,7 +38,7 @@ export class AuthController {
     @Res({ passthrough: true }) res: Response,
   ) {
     const user = await this.authService.register(registerDto);
-    
+
     // Login automático tras registro
     const loginResult = await this.authService.login(
       { email: registerDto.email, password: registerDto.password },
@@ -50,7 +50,9 @@ export class AuthController {
 
     return {
       message: 'Usuario registrado e identificado con éxito',
-      user: plainToInstance(UserResponseDto, user, { excludeExtraneousValues: true }),
+      user: plainToInstance(UserResponseDto, user, {
+        excludeExtraneousValues: true,
+      }),
     };
   }
 
@@ -71,7 +73,9 @@ export class AuthController {
     this.setCookies(res, accessToken, refreshToken);
 
     return {
-      user: plainToInstance(UserResponseDto, user, { excludeExtraneousValues: true }),
+      user: plainToInstance(UserResponseDto, user, {
+        excludeExtraneousValues: true,
+      }),
     };
   }
 
@@ -110,13 +114,15 @@ export class AuthController {
 
   @Get('me')
   async me(@CurrentUser() user: any) {
-    return plainToInstance(UserResponseDto, user, { excludeExtraneousValues: true });
+    return plainToInstance(UserResponseDto, user, {
+      excludeExtraneousValues: true,
+    });
   }
 
   @Get('sessions')
   async getSessions(@CurrentUser() user: any) {
     const sessions = await this.authService.getActiveSessions(user.id);
-    return sessions.map(s => ({
+    return sessions.map((s) => ({
       id: s.id,
       userAgent: s.userAgent,
       ipAddress: s.ipAddress,
@@ -136,15 +142,13 @@ export class AuthController {
 
   @Delete('sessions')
   @HttpCode(HttpStatus.NO_CONTENT)
-  async revokeOthers(
-    @CurrentUser() user: any,
-  ) {
+  async revokeOthers(@CurrentUser() user: any) {
     await this.authService.revokeOtherSessions(user.id, user.sessionId);
   }
 
   private setCookies(res: Response, access: string, refresh: string) {
     const isProd = process.env.NODE_ENV === 'production';
-    
+
     res.cookie('access_token', access, {
       httpOnly: true,
       secure: isProd,
