@@ -1,7 +1,9 @@
 import { Controller, Get } from '@nestjs/common';
-import { AppService } from './app.service';
+import { Public } from './modules/auth/decorators/public.decorator.js';
+import { AppService } from './app.service.js';
 
 @Controller()
+@Public()
 export class AppController {
   constructor(private readonly appService: AppService) {}
 

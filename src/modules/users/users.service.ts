@@ -115,9 +115,8 @@ export class UsersService implements OnModuleInit {
     return user;
   }
 
-  async findAllCustomers(page = 1, limit = 10): Promise<[User[], number]> {
+  async findAllPaginated(page = 1, limit = 10): Promise<[User[], number]> {
     return this.userRepository.findAndCount({
-      where: { role: Role.CUSTOMER },
       relations: ['profile'],
       take: limit,
       skip: (page - 1) * limit,
@@ -181,8 +180,87 @@ export class UsersService implements OnModuleInit {
     return this.findById(user.id);
   }
 
+  /** Creación de usuario por administrador */
+  async createByAdmin(dto: import('../admin/dto/create-user-by-admin.dto.js').CreateUserByAdminDto): Promise<User> {
+    const { email, password, role, cedula, fullName } = dto;
+
+    // Validar unicidad
+    await this.validateUniqueness(email, cedula);
+
+    const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
+
+    const savedUser = await this.dataSource.transaction(async (manager) => {
+      const user = manager.create(User, {
+        email,
+        passwordHash,
+        role,
+        isActive: true,
+        emailVerified: true,
+      });
+      const newUser = await manager.save(user);
+
+      const profile = manager.create(UserProfile, {
+        userId: newUser.id,
+        cedula,
+        fullName,
+        birthDate: new Date('2000-01-01'), // Default for admin creation
+        phone: '00000000', // Default
+      });
+      await manager.save(profile);
+
+      return newUser;
+    });
+
+    return this.findById(savedUser.id);
+  }
+
+  /** Actualización de usuario por administrador */
+  async updateByAdmin(id: string, dto: import('../admin/dto/update-user-by-admin.dto.js').UpdateUserByAdminDto): Promise<User> {
+    const { email, password, role, fullName, isActive } = dto;
+    const user = await this.findById(id);
+
+    if (email && email !== user.email) {
+      const existingEmail = await this.userRepository.findOneBy({ email });
+      if (existingEmail) {
+        throw new ConflictError({
+          errorCode: ErrorCode.USER_EMAIL_ALREADY_EXISTS,
+          userMessage: 'Este correo electrónico ya está registrado.',
+        });
+      }
+      user.email = email;
+    }
+
+    if (password) {
+      user.passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
+    }
+
+    if (role) {
+      user.role = role;
+    }
+
+    if (isActive !== undefined) {
+      user.isActive = isActive;
+    }
+
+    await this.userRepository.save(user);
+
+    if (fullName) {
+      await this.userProfileRepository.update({ userId: id }, { fullName });
+    }
+
+    return this.findById(id);
+  }
+
+  /** Cambio de estado activo/inactivo */
+  async updateStatus(id: string, isActive: boolean): Promise<User> {
+    const user = await this.findById(id);
+    user.isActive = isActive;
+    await this.userRepository.save(user);
+    return user;
+  }
+
   /** Actualización de perfil propio */
-  async updateMyProfile(userId: string, dto: import('./dto/user.dto.ts').UpdateMyProfileDto): Promise<User> {
+  async updateMyProfile(userId: string, dto: import('./dto/user.dto.js').UpdateMyProfileDto): Promise<User> {
     const { address, ...profileData } = dto;
 
     await this.dataSource.transaction(async (manager) => {
@@ -191,8 +269,6 @@ export class UsersService implements OnModuleInit {
       }
 
       if (address) {
-        // En este MVP asumimos que el usuario solo tiene una dirección principal
-        // O actualizamos la que es isDefault
         const defaultAddress = await manager.findOne(Address, { where: { userId, isDefault: true } });
         if (defaultAddress) {
           await manager.update(Address, defaultAddress.id, address);

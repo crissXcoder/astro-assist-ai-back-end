@@ -22,10 +22,15 @@ import { JwtRefreshGuard } from './guards/jwt-refresh.guard.js';
 import { CurrentUser } from './decorators/current-user.decorator.js';
 import { UserResponseDto } from '../users/dto/user-response.dto.js';
 
+import { Public } from './decorators/public.decorator.js';
+import { RolesGuard } from './guards/roles.guard.js';
+
 @Controller('auth')
+@UseGuards(JwtAuthGuard, RolesGuard)
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
+  @Public()
   @Post('register')
   async register(
     @Body() registerDto: RegisterDto,
@@ -49,6 +54,7 @@ export class AuthController {
     };
   }
 
+  @Public()
   @Post('login')
   @HttpCode(HttpStatus.OK)
   async login(
@@ -69,6 +75,7 @@ export class AuthController {
     };
   }
 
+  @Public()
   @UseGuards(JwtRefreshGuard)
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
@@ -90,7 +97,6 @@ export class AuthController {
     return { success: true };
   }
 
-  @UseGuards(JwtAuthGuard)
   @Post('logout')
   @HttpCode(HttpStatus.OK)
   async logout(
@@ -102,13 +108,11 @@ export class AuthController {
     return { message: 'Sesión cerrada correctamente' };
   }
 
-  @UseGuards(JwtAuthGuard)
   @Get('me')
   async me(@CurrentUser() user: any) {
     return plainToInstance(UserResponseDto, user, { excludeExtraneousValues: true });
   }
 
-  @UseGuards(JwtAuthGuard)
   @Get('sessions')
   async getSessions(@CurrentUser() user: any) {
     const sessions = await this.authService.getActiveSessions(user.id);
@@ -121,7 +125,6 @@ export class AuthController {
     }));
   }
 
-  @UseGuards(JwtAuthGuard)
   @Delete('sessions/:id')
   @HttpCode(HttpStatus.NO_CONTENT)
   async revokeSession(
@@ -131,7 +134,6 @@ export class AuthController {
     await this.authService.revokeSession(user.id, sessionId);
   }
 
-  @UseGuards(JwtAuthGuard)
   @Delete('sessions')
   @HttpCode(HttpStatus.NO_CONTENT)
   async revokeOthers(
