@@ -5,7 +5,6 @@ import {
   MinLength,
   MaxLength,
   IsDate,
-  IsPhoneNumber,
   IsOptional,
   Matches,
   ValidateNested,
@@ -54,19 +53,23 @@ export class AddressDto {
 
   @IsString()
   @IsNotEmpty()
-  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+  @Transform(({ value }: { value: unknown }) =>
+    typeof value === 'string' ? value.trim() : value,
+  )
   exactAddress!: string;
 
   @IsString()
   @IsOptional()
   @MaxLength(10)
-  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+  @Transform(({ value }: { value: unknown }) =>
+    typeof value === 'string' ? value.trim() : value,
+  )
   postalCode?: string;
 }
 
 export class RegisterCustomerDto {
   @IsEmail({}, { message: 'El correo electrónico no es válido' })
-  @Transform(({ value }) =>
+  @Transform(({ value }: { value: unknown }) =>
     typeof value === 'string' ? value.trim().toLowerCase() : value,
   )
   email!: string;
@@ -135,7 +138,7 @@ export class UpdateMyProfileDto {
 export class UpdateCustomerByAdminDto extends UpdateMyProfileDto {
   @IsEmail()
   @IsOptional()
-  @Transform(({ value }) =>
+  @Transform(({ value }: { value: unknown }) =>
     typeof value === 'string' ? value.trim().toLowerCase() : value,
   )
   email?: string;

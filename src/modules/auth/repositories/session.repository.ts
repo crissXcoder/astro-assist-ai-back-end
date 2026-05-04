@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { DataSource, Repository, IsNull, Not } from 'typeorm';
+import { DataSource, Repository, IsNull } from 'typeorm';
 import { Session } from '../entities/session.entity.js';
 
 @Injectable()

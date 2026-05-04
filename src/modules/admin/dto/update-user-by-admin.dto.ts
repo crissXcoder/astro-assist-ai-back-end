@@ -25,7 +25,7 @@ function NormalizeString({ value }: { value: unknown }): unknown {
 export class UpdateUserByAdminDto {
   @IsEmail({}, { message: 'Email inválido.' })
   @IsOptional()
-  @Transform(({ value }) =>
+  @Transform(({ value }: { value: unknown }) =>
     typeof value === 'string' ? value.trim().toLowerCase() : value,
   )
   email?: string;
