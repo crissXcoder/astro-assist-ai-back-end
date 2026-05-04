@@ -1,7 +1,6 @@
 import { Global, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { Session } from '../modules/auth/entities/session.entity.js';
 
 @Global()
 @Module({
@@ -29,7 +28,6 @@ import { Session } from '../modules/auth/entities/session.entity.js';
         };
       },
     }),
-    TypeOrmModule.forFeature([Session]),
   ],
   exports: [TypeOrmModule],
 })

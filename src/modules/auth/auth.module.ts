@@ -11,6 +11,7 @@ import { JwtRefreshStrategy } from './strategies/jwt-refresh.strategy.js';
 import { UsersModule } from '../users/users.module.js';
 import { SessionsModule } from '../sessions/sessions.module.js';
 import { Session } from './entities/session.entity.js';
+import { SessionRepository } from './repositories/session.repository.js';
 
 import { JwtAuthGuard } from './guards/jwt-auth.guard.js';
 import { RolesGuard } from './guards/roles.guard.js';
@@ -20,6 +21,7 @@ import { RolesGuard } from './guards/roles.guard.js';
     UsersModule,
     SessionsModule,
     PassportModule,
+    TypeOrmModule.forFeature([Session]),
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
@@ -31,6 +33,7 @@ import { RolesGuard } from './guards/roles.guard.js';
   ],
   providers: [
     AuthService,
+    SessionRepository,
     JwtStrategy,
     JwtRefreshStrategy,
     JwtAuthGuard,
@@ -45,6 +48,6 @@ import { RolesGuard } from './guards/roles.guard.js';
     },
   ],
   controllers: [AuthController],
-  exports: [AuthService, JwtAuthGuard, RolesGuard],
+  exports: [AuthService, SessionRepository, JwtAuthGuard, RolesGuard],
 })
 export class AuthModule {}

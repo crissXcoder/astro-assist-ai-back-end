@@ -1,17 +1,17 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, IsNull } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import { UsersService } from '../users/users.service.js';
 import { Session } from './entities/session.entity.js';
-import { RegisterDto } from './dto/register.dto.js';
-import { LoginDto } from './dto/login.dto.js';
+import { RegisterDto } from '@shared/dto/register.dto.js';
+import { LoginDto } from '@shared/dto/login.dto.js';
+import { User } from '../users/entities/user.entity.js';
 import {
   SecurityEventsService,
   SecurityEventType,
 } from '../sessions/security-events.service.js';
+import { SessionRepository } from './repositories/session.repository.js';
 import { ErrorCode } from '../../common/constants/error-codes.js';
 
 @Injectable()
@@ -20,47 +20,12 @@ export class AuthService {
     private readonly usersService: UsersService,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
-    @InjectRepository(Session)
-    private readonly sessionRepository: Repository<Session>,
+    private readonly sessionRepository: SessionRepository,
     private readonly securityEventsService: SecurityEventsService,
   ) {}
 
   async register(registerDto: RegisterDto) {
-    const {
-      email,
-      password,
-      cedula,
-      fullName,
-      birthDate,
-      phone,
-      province,
-      canton,
-      district,
-      city,
-      exactAddress,
-      postalCode,
-    } = registerDto;
-
-    // registerCustomer ya valida unicidad de email/cédula
-    const user = await this.usersService.registerCustomer({
-      email,
-      password,
-      confirmPassword: password,
-      cedula,
-      fullName,
-      birthDate: new Date(birthDate),
-      phone,
-      address: {
-        province,
-        canton,
-        district,
-        town: city,
-        exactAddress,
-        postalCode,
-      },
-    });
-
-    return user;
+    return this.usersService.registerCustomer(registerDto);
   }
 
   async login(loginDto: LoginDto, userAgent?: string, ip?: string) {
@@ -96,7 +61,7 @@ export class AuthService {
 
     const savedSession = await this.sessionRepository.save(session);
 
-    const tokens = await this.generateTokens(user, savedSession.id);
+    const tokens = this.generateTokens(user, savedSession.id);
 
     // Hashear refresh token antes de guardar
     savedSession.refreshTokenHash = await bcrypt.hash(tokens.refreshToken, 10);
@@ -120,9 +85,7 @@ export class AuthService {
     }
 
     // Buscar sesiones activas del usuario
-    const sessions = await this.sessionRepository.find({
-      where: { userId: user.id, revokedAt: IsNull() },
-    });
+    const sessions = await this.sessionRepository.findActiveByUserId(user.id);
 
     // Validar el hash del token contra las sesiones
     let currentSession: Session | undefined;
@@ -142,7 +105,7 @@ export class AuthService {
     }
 
     // Rotación: generar nuevos tokens
-    const tokens = await this.generateTokens(user, currentSession.id);
+    const tokens = this.generateTokens(user, currentSession.id);
 
     // Actualizar sesión con nuevo hash y metadatos
     currentSession.refreshTokenHash = await bcrypt.hash(
@@ -159,10 +122,7 @@ export class AuthService {
   }
 
   async logout(sessionId: string, userId: string) {
-    await this.sessionRepository.update(
-      { id: sessionId },
-      { revokedAt: new Date() },
-    );
+    await this.sessionRepository.revokeSession(sessionId);
 
     this.securityEventsService.emit(userId, SecurityEventType.SESSION_REVOKED, {
       sessionId,
@@ -170,22 +130,18 @@ export class AuthService {
   }
 
   async getActiveSessions(userId: string) {
-    return this.sessionRepository.find({
-      where: { userId, revokedAt: IsNull() },
-      order: { lastUsedAt: 'DESC' },
-    });
+    return this.sessionRepository.findActiveByUserId(userId);
   }
 
   async revokeSession(userId: string, sessionId: string) {
-    const session = await this.sessionRepository.findOneBy({
-      id: sessionId,
+    const session = await this.sessionRepository.findByIdAndUserId(
+      sessionId,
       userId,
-    });
+    );
     if (!session) {
       throw new UnauthorizedException('Sesión no encontrada.');
     }
-    session.revokedAt = new Date();
-    await this.sessionRepository.save(session);
+    await this.sessionRepository.revokeSession(sessionId);
 
     this.securityEventsService.emit(userId, SecurityEventType.SESSION_REVOKED, {
       sessionId,
@@ -193,18 +149,10 @@ export class AuthService {
   }
 
   async revokeOtherSessions(userId: string, currentSessionId: string) {
-    await this.sessionRepository
-      .createQueryBuilder()
-      .update(Session)
-      .set({ revokedAt: new Date() })
-      .where(
-        'userId = :userId AND id != :currentSessionId AND revokedAt IS NULL',
-        {
-          userId,
-          currentSessionId,
-        },
-      )
-      .execute();
+    await this.sessionRepository.revokeAllOtherSessions(
+      userId,
+      currentSessionId,
+    );
 
     this.securityEventsService.emit(
       userId,
@@ -215,7 +163,7 @@ export class AuthService {
     );
   }
 
-  private async generateTokens(user: any, sessionId: string) {
+  private generateTokens(user: User, sessionId: string) {
     const accessToken = this.jwtService.sign(
       {
         sub: user.id,

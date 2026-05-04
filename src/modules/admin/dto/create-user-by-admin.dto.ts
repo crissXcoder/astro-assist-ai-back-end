@@ -5,7 +5,6 @@ import {
   MinLength,
   MaxLength,
   IsDate,
-  IsOptional,
   Matches,
   ValidateNested,
 } from 'class-validator';
@@ -32,7 +31,7 @@ function NormalizeCedula({ value }: { value: unknown }): unknown {
  */
 export class CreateUserByAdminDto {
   @IsEmail({}, { message: 'El correo electrónico no es válido.' })
-  @Transform(({ value }) =>
+  @Transform(({ value }: { value: unknown }) =>
     typeof value === 'string' ? value.trim().toLowerCase() : value,
   )
   email!: string;
