@@ -23,8 +23,8 @@
     "strictBindCallApply": true,
     "noFallthroughCasesInSwitch": true,
     "paths": {
-      "@shared/*": ["../AstroAssist-AI-FrontEnd/shared/*"]
+      "@shared/*": ["../shared/*"]
     }
   },
-  "include": ["src/**/*", "../AstroAssist-AI-FrontEnd/shared/dto/**/*"]
+  "include": ["src/**/*", "test/**/*", "../shared/dto/**/*"]
 }

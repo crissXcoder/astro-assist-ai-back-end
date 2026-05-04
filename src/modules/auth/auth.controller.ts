@@ -15,8 +15,8 @@ import {
 import type { Request, Response } from 'express';
 import { plainToInstance } from 'class-transformer';
 import { AuthService } from './auth.service.js';
-import { RegisterDto } from '@shared/dto/register.dto';
-import { LoginDto } from '@shared/dto/login.dto';
+import { RegisterDto } from '@shared/dto/register.dto.js';
+import { LoginDto } from '@shared/dto/login.dto.js';
 import { JwtAuthGuard } from './guards/jwt-auth.guard.js';
 import { JwtRefreshGuard } from './guards/jwt-refresh.guard.js';
 import { CurrentUser } from './decorators/current-user.decorator.js';
@@ -24,6 +24,7 @@ import { UserResponseDto } from '../users/dto/user-response.dto.js';
 
 import { Public } from './decorators/public.decorator.js';
 import { RolesGuard } from './guards/roles.guard.js';
+import type { AuthenticatedUser } from '../auth/interfaces/authenticated-user.interface.js';
 
 @Controller('auth')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -84,7 +85,7 @@ export class AuthController {
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
   async refresh(
-    @CurrentUser() user: any,
+    @CurrentUser() user: AuthenticatedUser & { refreshToken: string },
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ) {
@@ -104,7 +105,7 @@ export class AuthController {
   @Post('logout')
   @HttpCode(HttpStatus.OK)
   async logout(
-    @CurrentUser() user: any,
+    @CurrentUser() user: AuthenticatedUser,
     @Res({ passthrough: true }) res: Response,
   ) {
     await this.authService.logout(user.sessionId, user.id);
@@ -113,14 +114,16 @@ export class AuthController {
   }
 
   @Get('me')
-  async me(@CurrentUser() user: any) {
-    return plainToInstance(UserResponseDto, user, {
-      excludeExtraneousValues: true,
-    });
+  async me(@CurrentUser() user: AuthenticatedUser): Promise<UserResponseDto> {
+    return await Promise.resolve(
+      plainToInstance(UserResponseDto, user, {
+        excludeExtraneousValues: true,
+      }),
+    );
   }
 
   @Get('sessions')
-  async getSessions(@CurrentUser() user: any) {
+  async getSessions(@CurrentUser() user: AuthenticatedUser) {
     const sessions = await this.authService.getActiveSessions(user.id);
     return sessions.map((s) => ({
       id: s.id,
@@ -134,7 +137,7 @@ export class AuthController {
   @Delete('sessions/:id')
   @HttpCode(HttpStatus.NO_CONTENT)
   async revokeSession(
-    @CurrentUser() user: any,
+    @CurrentUser() user: AuthenticatedUser,
     @Param('id', ParseUUIDPipe) sessionId: string,
   ) {
     await this.authService.revokeSession(user.id, sessionId);
@@ -142,7 +145,7 @@ export class AuthController {
 
   @Delete('sessions')
   @HttpCode(HttpStatus.NO_CONTENT)
-  async revokeOthers(@CurrentUser() user: any) {
+  async revokeOthers(@CurrentUser() user: AuthenticatedUser) {
     await this.authService.revokeOtherSessions(user.id, user.sessionId);
   }
 

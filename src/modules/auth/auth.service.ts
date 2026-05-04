@@ -1,13 +1,11 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
-import { InjectRepository } from '@nestjs/typeorm';
-import { IsNull } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import { UsersService } from '../users/users.service.js';
 import { Session } from './entities/session.entity.js';
-import { RegisterDto } from '@shared/dto/register.dto';
-import { LoginDto } from '@shared/dto/login.dto';
+import { RegisterDto } from '@shared/dto/register.dto.js';
+import { LoginDto } from '@shared/dto/login.dto.js';
 import { User } from '../users/entities/user.entity.js';
 import {
   SecurityEventsService,
@@ -63,7 +61,7 @@ export class AuthService {
 
     const savedSession = await this.sessionRepository.save(session);
 
-    const tokens = await this.generateTokens(user, savedSession.id);
+    const tokens = this.generateTokens(user, savedSession.id);
 
     // Hashear refresh token antes de guardar
     savedSession.refreshTokenHash = await bcrypt.hash(tokens.refreshToken, 10);
@@ -107,7 +105,7 @@ export class AuthService {
     }
 
     // Rotación: generar nuevos tokens
-    const tokens = await this.generateTokens(user, currentSession.id);
+    const tokens = this.generateTokens(user, currentSession.id);
 
     // Actualizar sesión con nuevo hash y metadatos
     currentSession.refreshTokenHash = await bcrypt.hash(
@@ -165,7 +163,7 @@ export class AuthService {
     );
   }
 
-  private async generateTokens(user: User, sessionId: string) {
+  private generateTokens(user: User, sessionId: string) {
     const accessToken = this.jwtService.sign(
       {
         sub: user.id,

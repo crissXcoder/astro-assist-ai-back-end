@@ -10,6 +10,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, IsNull } from 'typeorm';
 import { Session } from '../entities/session.entity.js';
 import { ErrorCode } from '../../../common/constants/error-codes.js';
+import { AuthenticatedUser } from '../interfaces/authenticated-user.interface.js';
+import { Request } from 'express';
 
 @Injectable()
 export class JwtAuthGuard extends AuthGuard('jwt') {
@@ -31,36 +33,36 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
       return true;
     }
 
-    // Ejecutar lógica base de passport (JwtStrategy.validate)
-    const canActivate = await super.canActivate(context);
+    // Ejecutar la lógica de Passport primero
+    const canActivate = (await super.canActivate(context)) as boolean;
     if (!canActivate) {
       return false;
     }
 
-    const request = context.switchToHttp().getRequest();
+    const request = context
+      .switchToHttp()
+      .getRequest<Request & { user: AuthenticatedUser }>();
     const user = request.user;
 
-    // 1. Validar que el usuario esté activo (ya se hace en strategy usualmente, pero reforzamos)
-    if (!user) {
+    // Verificar si la sesión ha sido revocada en la base de datos
+    const sessionId = user.sessionId;
+
+    if (!sessionId) {
       throw new UnauthorizedException({
-        errorCode: ErrorCode.AUTH_ACCESS_DENIED,
-        userMessage: 'Usuario no autenticado.',
+        errorCode: ErrorCode.AUTH_SESSION_INVALID,
+        userMessage: 'Sesión inválida.',
       });
     }
 
-    // 2. Validar sesión en DB si existe sessionId (sid)
-    if (user.sessionId) {
-      const session = await this.sessionRepository.findOne({
-        where: { id: user.sessionId, revokedAt: IsNull() },
-      });
+    const session = await this.sessionRepository.findOne({
+      where: { id: sessionId, revokedAt: IsNull() },
+    });
 
-      if (!session || session.expiresAt < new Date()) {
-        throw new UnauthorizedException({
-          errorCode: ErrorCode.AUTH_SESSION_EXPIRED,
-          userMessage:
-            'Tu sesión ha expirado o ha sido revocada. Inicia sesión de nuevo.',
-        });
-      }
+    if (!session) {
+      throw new UnauthorizedException({
+        errorCode: ErrorCode.AUTH_SESSION_REVOKED,
+        userMessage: 'Tu sesión ha sido cerrada desde otro dispositivo.',
+      });
     }
 
     return true;
