@@ -15,8 +15,8 @@ import {
 import type { Request, Response } from 'express';
 import { plainToInstance } from 'class-transformer';
 import { AuthService } from './auth.service.js';
-import { RegisterDto } from '@shared/dto/register.dto.js';
-import { LoginDto } from '@shared/dto/login.dto.js';
+import { RegisterDto } from './dto/register.dto.js';
+import { LoginDto } from './dto/login.dto.js';
 import { JwtAuthGuard } from './guards/jwt-auth.guard.js';
 import { JwtRefreshGuard } from './guards/jwt-refresh.guard.js';
 import { CurrentUser } from './decorators/current-user.decorator.js';
