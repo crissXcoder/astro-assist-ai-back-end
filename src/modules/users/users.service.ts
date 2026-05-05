@@ -15,7 +15,7 @@ import {
 } from '../sessions/security-events.service.js';
 import { NotFoundError, ConflictError } from '../../common/exceptions/index.js';
 import { ErrorCode } from '../../common/constants/error-codes.js';
-import { RegisterDto } from '@shared/dto/register.dto';
+import { RegisterDto } from './dto/register.dto.js';
 
 /** Rounds de bcrypt. 12 es un buen balance seguridad/performance. */
 const BCRYPT_ROUNDS = 12;

@@ -4,8 +4,8 @@ import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
 import { UsersService } from '../users/users.service.js';
 import { Session } from './entities/session.entity.js';
-import { RegisterDto } from '@shared/dto/register.dto.js';
-import { LoginDto } from '@shared/dto/login.dto.js';
+import { RegisterDto } from './dto/register.dto.js';
+import { LoginDto } from './dto/login.dto.js';
 import { User } from '../users/entities/user.entity.js';
 import {
   SecurityEventsService,

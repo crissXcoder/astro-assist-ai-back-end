@@ -3,7 +3,7 @@ import { plainToInstance } from 'class-transformer';
 import { UsersService } from './users.service.js';
 import { UserResponseDto } from './dto/user-response.dto.js';
 import { UpdateMyProfileDto } from './dto/user.dto.js';
-import { RegisterDto } from '@shared/dto/register.dto';
+import { RegisterDto } from './dto/register.dto.js';
 import { CurrentUser } from '../auth/decorators/current-user.decorator.js';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard.js';
 import { RolesGuard } from '../auth/guards/roles.guard.js';

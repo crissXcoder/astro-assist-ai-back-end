@@ -9,6 +9,7 @@ import { IS_PUBLIC_KEY } from '../decorators/public.decorator.js';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, IsNull } from 'typeorm';
 import { Session } from '../entities/session.entity.js';
+import { SessionRepository } from '../repositories/session.repository.js';
 import { ErrorCode } from '../../../common/constants/error-codes.js';
 import { AuthenticatedUser } from '../interfaces/authenticated-user.interface.js';
 import { Request } from 'express';
@@ -17,8 +18,7 @@ import { Request } from 'express';
 export class JwtAuthGuard extends AuthGuard('jwt') {
   constructor(
     private reflector: Reflector,
-    @InjectRepository(Session)
-    private readonly sessionRepository: Repository<Session>,
+    private readonly sessionRepository: SessionRepository,
   ) {
     super();
   }
